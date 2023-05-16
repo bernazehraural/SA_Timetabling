@@ -87,30 +87,6 @@ for student in df_student_class['Öğrenci No'].unique():
 # Define the constraint (non-conforming exam)
 non_conforming_exam = {'BAU091', 'BAU107', 'BWL407', 'BWL413', 'BWL415', 'BWL417', 'ENG203', 'DEU121', 'WIN311', 'WIN313' }
 
-example_students = [{'id': '11602014', 
-                    'taken_exams': ['HUK451', 'HUK453', 
-                                    'HUK455', 'HUK457', 
-                                    'HUK459', 'HUK461', 
-                                    'HUK463', 'HUK465', 
-                                    'HUK755', 'POL550', 
-                                    'ÜSDMBT369']}, 
-                    {'id': '11601011', 
-                     'taken_exams': ['ENG301', 'ISG001', 
-                                     'MWT301', 'MWT309', 
-                                     'MWT311', 'MWT401', 
-                                     'NWI401', 'NWI407']}, 
-                    {'id': '11405021', 
-                     'taken_exams': ['ENG301', 'MEC203', 
-                                     'VWL203', 'VWL301', 
-                                     'WIN403', 'WIN499']}, 
-                    {'id': '1905080', 
-                     'taken_exams': ['INF503', 'INF714']}, 
-                    {'id': '1902011', 
-                     'taken_exams': ['ENG201', 'HUK251',
-                                      'HUK253', 'HUK255', 
-                                      'HUK257', 'HUK259', 
-                                      'HUK261']}]
-
 
 def calculate_cost(solution):
     # Initialize the cost to zero
