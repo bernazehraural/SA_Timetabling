@@ -100,13 +100,17 @@ def calculate_cost(solution):
         for room in rooms:
             students_in_room = []
             exams_in_room = room['schedule'][day][time]['course']
+            print(exams_in_room)
             for exam, assigned_timeslot in solution.items():
                 if not exam.endswith("_room"):
                         exam_day, exam_time = assigned_timeslot.split(" ")
                         if exam_day == day and exam_time == time:
+                            """
                             if exam in non_conforming_exam:
                                 cost += 1
+                            """
                             if exam == exams_in_room:
+                                print("girdi")
                                 students_in_room.extend([student['id'] for student in students if exam in student['taken_exams']])
 
                                 #Add room details to the cost calculation
@@ -124,9 +128,7 @@ def calculate_cost(solution):
                                     cost += 1  # Increase the cost if a student has multiple exams at the same timeslot
                                 else:
                                     student_timeslots.add((student_id, day, time))
-
-
-                cost += len(students_in_room) * (len(students_in_room) - 1) / 2
+                                    
     return cost
 
 
@@ -142,6 +144,7 @@ def perturb_solution(solution):
     new_solution[exam_id] = new_timeslot
 
     room = random.choice(rooms)
+    day, time = new_timeslot.split(" ")
     room['schedule'][day][time]['course'] = exam_id
     # Assign the exam to the new timeslot
     new_solution[exam_id + '_room'] = {'id': room['id'], 'building': room['building'], 'floor': room['floor'], 'room_code': room['room_code']}
