@@ -3,20 +3,22 @@ import random
 import pandas as pd
 import datetime
 import openpyxl
+import time as tme
+
+# İşlem başlangıcı
+start_time = tme.time()
 
 
 time_slots = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00']
-num_days = 10 # the number of exam days
+num_days = 14 # the number of exam days
 slots_per_day = len(time_slots)
 total_slots = num_days * slots_per_day
 
 start_date = datetime.date.today()  # yyyy, mm, dd
 day_buffer = 14
 # Generate a list of dates using a loop and the datetime module
-exam_days = []
-for i in range(num_days):
-    day = start_date + datetime.timedelta(days=i+14)
-    exam_days.append(day.strftime('%Y-%m-%d'))
+exam_days = [(start_date + datetime.timedelta(days=i + day_buffer)).strftime('%Y-%m-%d') for i in range(num_days)]
+
 
 generated_available_timeslots = []
 for day in exam_days:
@@ -54,7 +56,8 @@ rooms_capacities = []
 for room in rooms:
     rooms_capacities.append(room['capacity'])
 
-print(max(rooms_capacities))
+# print(max(rooms_capacities))
+# print(len(rooms))
 
 
 # create exams dictionary
@@ -67,13 +70,13 @@ for exam in df_classes['Ders Kodu'].unique():
     for room in rooms:
         if room['capacity'] >= num_students:
             # Assign the exam to the room
-            room['schedule'][exam_days[0]][time_slots[0]]['course'] = exam + '_room'
+            room['schedule'][exam_days[0]][time_slots[0]]['course'] = str(exam) + '_room'
             exam_dict['assigned_room'] = room['id']
             break
     
     exams.append(exam_dict)
 
-print(len(exams))
+# print(len(exams))
 
 
 # create students dictionary
@@ -83,10 +86,7 @@ for student in df_student_class['Öğrenci No'].unique():
     student_dict = {'id': str(student), 'taken_exams': taken_exams}
     students.append(student_dict)
 
-
-# Define the constraint (non-conforming exam)
-non_conforming_exam = {'BAU091', 'BAU107', 'BWL407', 'BWL413', 'BWL415', 'BWL417', 'ENG203', 'DEU121', 'WIN311', 'WIN313' }
-
+# print(len(students))
 
 def calculate_cost(solution):
     # Initialize the cost to zero
@@ -100,17 +100,18 @@ def calculate_cost(solution):
         for room in rooms:
             students_in_room = []
             exams_in_room = room['schedule'][day][time]['course']
-            print(exams_in_room)
             for exam, assigned_timeslot in solution.items():
-                if not exam.endswith("_room"):
+                if not str(exam).endswith("_room"):
                         exam_day, exam_time = assigned_timeslot.split(" ")
                         if exam_day == day and exam_time == time:
-                            """
-                            if exam in non_conforming_exam:
-                                cost += 1
-                            """
                             if exam == exams_in_room:
-                                print("girdi")
+                                # Check if any student is already assigned to the current timeslot
+                                for student_id in students_in_room:
+                                    if (student_id, day, time) in student_timeslots:
+                                        cost += 1  # Increase the cost if a student has multiple exams at the same timeslot
+                                    else:
+                                        student_timeslots.add((student_id, day, time))
+                                
                                 students_in_room.extend([student['id'] for student in students if exam in student['taken_exams']])
 
                                 #Add room details to the cost calculation
@@ -120,15 +121,27 @@ def calculate_cost(solution):
                                 cost += 0.1 * len(students_in_room) * (len(students_in_room) - 1) / 2 
 
                             else:
+
                                 cost += 1
 
-                            # Check if any student is already assigned to the current timeslot
-                            for student_id in students_in_room:
-                                if (student_id, day, time) in student_timeslots:
-                                    cost += 1  # Increase the cost if a student has multiple exams at the same timeslot
-                                else:
-                                    student_timeslots.add((student_id, day, time))
-                                    
+
+    maxi_exams = ["DEU121","ENG101","ENG201","ENG301","MAT103","MAT201"]
+
+    for student in students:
+        exam_timeslots = []
+        for exam in student['taken_exams']:
+            if exam in solution and exam not in maxi_exams:
+                date = solution[exam]
+                exam_timeslots.append(date)
+            
+        has_duplicates = len(exam_timeslots) != len(set(exam_timeslots))
+
+        if has_duplicates:
+            cost += 2
+        else:
+            pass
+
+
     return cost
 
 
@@ -138,7 +151,7 @@ def perturb_solution(solution):
     # Create a copy of the solution to modify
     new_solution = solution.copy()
     # Choose an exam to reassign to a new timeslot
-    exam_id = random.choice(list(key for key in new_solution.keys() if not key.endswith("_room")))
+    exam_id = random.choice(list(key for key in new_solution.keys() if not str(key).endswith("_room")))
     new_timeslot = random.choice(generated_available_timeslots)
     # Assign the exam to the new timeslot
     new_solution[exam_id] = new_timeslot
@@ -147,17 +160,19 @@ def perturb_solution(solution):
     day, time = new_timeslot.split(" ")
     room['schedule'][day][time]['course'] = exam_id
     # Assign the exam to the new timeslot
-    new_solution[exam_id + '_room'] = {'id': room['id'], 'building': room['building'], 'floor': room['floor'], 'room_code': room['room_code']}
+    new_solution[str(exam_id) + '_room'] = {'id': room['id'], 'building': room['building'], 'floor': room['floor'], 'room_code': room['room_code']}
 
     return new_solution
 
+temps = []
 
 def simulated_annealing(current_solution, initial_temperature, cooling_factor, num_iterations):
     # Set the initial temperature
     current_temperature = initial_temperature
+    temps.append(current_temperature)
     # Set the current solution and cost as the best solution and cost found so far
     best_solution = current_solution
-    best_cost = calculate_cost(current_solution)
+    best_cost = calculate_cost(best_solution)
     # Calculate the cost of the initial solution
     current_cost = calculate_cost(current_solution)
     # Iterate for the specified number of iterations
@@ -184,9 +199,9 @@ def simulated_annealing(current_solution, initial_temperature, cooling_factor, n
                 current_cost = new_cost
         # Reduce the temperature
         current_temperature *= cooling_factor
+        temps.append(current_temperature)
     # Return the best solution found
     return best_solution, best_cost
-
 
 exams_dict = {exam['id']: exam for exam in exams}
 rooms_dict = {room['id']: room for room in rooms}
@@ -204,7 +219,7 @@ for exam in exams:
         day, time = random.choice(generated_available_timeslots).split(" ")
         # Check if the room is available
         if exam['num_students'] > max(rooms_capacities):
-            print(exam['id'] + '  This class is taken by students more than max capacity of one biggest classroom')
+            # print(exam['id'] + '  This class is taken by students more than max capacity of one biggest classroom')
             assigned = True
         if room['schedule'][day][time]['course'] is None and exam['num_students'] <= room['capacity'] :
             # Assign the exam to the room and timeslot
@@ -212,17 +227,18 @@ for exam in exams:
             initial_solution[exam['id']] = day + ' ' + time
 
             # Add room details to the initial solution
-            initial_solution[exam['id']+'_room'] = {'id': room['id'], 'building': room['building'], 'floor': room['floor'], 'room_code': room['room_code']}
+            initial_solution[str(exam['id'])+'_room'] = {'id': room['id'], 'building': room['building'], 'floor': room['floor'], 'room_code': room['room_code']}
             
             assigned = True
 
-#print(initial_solution)
+# print(initial_solution)
 
-optimized_solution, best_cost = simulated_annealing(initial_solution, initial_temperature=10, cooling_factor=0.99, num_iterations=2000)
+optimized_solution, best_cost = simulated_annealing(initial_solution, initial_temperature=10, cooling_factor=0.85, num_iterations=2000)
+
+# print(temps)
 
 # print("Optimized solution:")
-# best-cost: 2991058.8/ initial_temp = 100/ cooling_factor=0.95 / num_iter=1000 ---> 15396.0
-print(optimized_solution, best_cost)
+# print(optimized_solution, best_cost)
 
 
 """
@@ -244,7 +260,7 @@ sheet['C1'] = 'Room Info'
 # Write dictionary values to rows
 row = 2  # start writing rows from the second row
 for key, value in initial_solution.items():
-    if not key.endswith("_room"):
+    if not str(key).endswith("_room"):
         # Write exam ID to column A
         sheet.cell(row=row, column=1).value = key
         
@@ -253,7 +269,7 @@ for key, value in initial_solution.items():
         if type(value) == dict:
             timeslot = value.get('timeslot')
         sheet.cell(row=row, column=2).value = timeslot
-    if key.endswith("_room"):
+    if str(key).endswith("_room"):
         # Write room info to column C
         room_info = ''
         if type(value) == dict:
@@ -279,7 +295,7 @@ sheet['C1'] = 'Room Info'
 # Write dictionary values to rows
 row = 2  # start writing rows from the second row
 for key, value in optimized_solution.items():
-    if not key.endswith("_room"):
+    if not str(key).endswith("_room"):
         # Write exam ID to column A
         sheet.cell(row=row, column=1).value = key
         
@@ -288,7 +304,7 @@ for key, value in optimized_solution.items():
         if type(value) == dict:
             timeslot = value.get('timeslot')
         sheet.cell(row=row, column=2).value = timeslot
-    if key.endswith("_room"):
+    if str(key).endswith("_room"):
         # Write room info to column C
         room_info = ''
         if type(value) == dict:
@@ -302,13 +318,7 @@ for key, value in optimized_solution.items():
 # Save the Excel workbook
 wb2.save('exam_schedule.xlsx')
 
-"""
-#INF205,211,WIN107
-for student in students:
-    for exam in student['taken_exams']:
-        if exam not in ['DEU121', 'ENG101', 'ENG201', 'ENG301', 'MAT103', 'MAT201']:
-            print(exam)
-            print(optimized_solution[exam])
-            print(optimized_solution[str(exam) + "_room"])
-    print("--------")
-"""
+end_time = tme.time()
+execution_time = end_time - start_time
+
+print(best_cost, execution_time)
